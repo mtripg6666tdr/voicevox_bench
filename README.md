@@ -1,0 +1,2 @@
+# voicevox_bench
+VOICEVOXの動作速度を測定するベンチマーク
