@@ -51,14 +51,15 @@ def get_speakers(address="127.0.0.1",port=50021):
       speakers[i["name"]][s["name"]] = s["id"]
   return speakers
 
-def bench(length:int,count=10,address="127.0.0.1",port=50021):
+def bench(length:int,count=10,address="127.0.0.1",port=50021,quiet=False):
   synthesis("test",address=address,port=port)
   tmp = 0
   for i in range(count):
     text = gen_text(length)
     elapsed_time,latency = synthesis(text,address=address,port=port)
     tmp += elapsed_time
-    print(i+1,elapsed_time,latency)
+    if not quiet:
+      print(i+1,"time:",elapsed_time,"latency:",latency)
     result = round(tmp / count,4)
   return result
 
@@ -66,10 +67,14 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("-s",help="VOICEVOX API Server Address",default="127.0.0.1")
   parser.add_argument("-p",help="VOICEVOX API Server Port",default=50021)
+  parser.add_argument("-q",help="Quiet benchmark log",action="store_true")
+  parser.add_argument("-w",help="No wait for key input",action="store_true")
   args = parser.parse_args()
-  score_10 = bench(length=10,address=args.s,port=args.p)
-  score_50 = bench(length=50,address=args.s,port=args.p)
-  score_100 = bench(length=100,address=args.s,port=args.p)
+  if not args.w:
+    input("Press Enter key to start benchmark...")
+  score_10 = bench(length=10,address=args.s,port=args.p,quiet=args.q)
+  score_50 = bench(length=50,address=args.s,port=args.p,quiet=args.q)
+  score_100 = bench(length=100,address=args.s,port=args.p,quiet=args.q)
   score_avg = round((score_10 + score_50 + score_100) / 3,4)
   resp = requests.get(f"http://{args.s}:{args.p}/version")
   info_engine = resp.text.replace("\"","")
@@ -81,7 +86,7 @@ if __name__ == "__main__":
     info_device = "DirectML"
   else:
     info_device = "CPU"
-  
+  print()
   print("=========== Info ===========")
   print(" Engine:",info_engine)
   print(" Device:",info_device)
@@ -91,3 +96,6 @@ if __name__ == "__main__":
   print(" 100:",score_100)
   print(" Avg:",score_avg)
   print("============================")
+  print()
+  if not args.w:
+    input("Press Enter key to exit...")
