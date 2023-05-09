@@ -18,7 +18,7 @@ def synthesis(
         speed : スピード
 
     Returns:
-        生成時間(秒), レイテンシ(秒)
+        生成時間(秒)
     """
     address = "http://"+address
     query_payload = {"text": text, "speaker": speaker}
@@ -29,17 +29,13 @@ def synthesis(
     synth_payload = {"speaker": speaker}
     query_data["speedScale"] = speed
     query_data["pitchScale"] = pitch
-    # before = perf_counter()
-    # requests.get(f"{address}:{port}/version")
-    # after = perf_counter()
-    # latency = after - before
     before = perf_counter()
     resp = requests.post(f"{address}:{port}/synthesis",
                          params=synth_payload, data=json.dumps(query_data))
     if not resp.status_code == 200:
         raise ConnectionError("Status code: %d" % resp.status_code)
     after = perf_counter()
-    return after - before  # - latency , latency
+    return after - before
 
 
 def gen_text(count: int):
@@ -64,7 +60,6 @@ def bench(length: int, count=10, address="127.0.0.1", port=50021, quiet=False):
     tmp = 0
     for i in range(count):
         text = gen_text(length)
-        # elapsed_time,latency = synthesis(text,address=address,port=port)
         elapsed_time = synthesis(text, address=address, port=port)
         tmp += elapsed_time
         if not quiet:
