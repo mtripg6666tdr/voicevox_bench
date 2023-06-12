@@ -37,8 +37,10 @@ def synthesis(
     after = perf_counter()
     return after - before
 
-def gen_text(count:int):
-  return "".join([chr(random.randint(ord("あ"),ord("ん"))) for i in range(count)])
+
+def gen_text(count: int):
+    return "".join(
+        [chr(random.randint(ord("あ"), ord("ん"))) for i in range(count)])
 
 
 def get_speakers(address="127.0.0.1", port=50021):
@@ -65,9 +67,47 @@ def bench(length: int, count=10, address="127.0.0.1", port=50021, quiet=False):
         result = round(tmp / count, 4)
     return result
 
-score_10 = bench(length=10,address="127.0.0.1")
-score_50 = bench(length=50,address="127.0.0.1")
-score_100 = bench(length=100,address="127.0.0.1")
-print("10:",score_10)
-print("50:",score_50)
-print("100:",score_100)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-s", help="VOICEVOX API Server Address", default="127.0.0.1")
+    parser.add_argument("-p", help="VOICEVOX API Server Port", default=50021)
+    parser.add_argument("-q", help="Quiet benchmark log", action="store_true")
+    parser.add_argument("-w", help="No wait for key input",
+                        action="store_true")
+    parser.add_argument("--ssl", help="Use SSL", action="store_true")
+    args = parser.parse_args()
+    if not args.w:
+        input("Press Enter key to start benchmark...")
+    if args.ssl:
+        ADDRESS = "https://" + args.s
+    else:
+        ADDRESS = "http://" + args.s
+    score_10 = bench(length=10, address=args.s, port=args.p, quiet=args.q)
+    score_50 = bench(length=50, address=args.s, port=args.p, quiet=args.q)
+    score_100 = bench(length=100, address=args.s, port=args.p, quiet=args.q)
+    score_avg = round((score_10 + score_50 + score_100) / 3, 4)
+    resp = requests.get(f"{ADDRESS}:{args.p}/version")
+    info_engine = resp.text.replace("\"", "")
+    resp = requests.get(f"{ADDRESS}:{args.p}/supported_devices")
+    info_devices = resp.json()
+    if info_devices["cuda"]:
+        info_device = "CUDA"
+    elif info_devices["dml"]:
+        info_device = "DirectML"
+    else:
+        info_device = "CPU"
+    print()
+    print("=========== Info ===========")
+    print(" Engine:", info_engine)
+    print(" Device:", info_device)
+    print("========== Result ==========")
+    print(" 10: ", score_10)
+    print(" 50: ", score_50)
+    print(" 100:", score_100)
+    print(" Avg:", score_avg)
+    print("============================")
+    print()
+    if not args.w:
+        input("Press Enter key to exit...")
