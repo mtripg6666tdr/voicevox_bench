@@ -5,14 +5,29 @@ from time import perf_counter
 import argparse
 
 
+def parse_headers(header_list: list) -> dict:
+    """ヘッダーリストを辞書形式に変換"""
+    headers = {}
+    for header in header_list:
+        key, value = header.split(":", 1)
+        headers[key.strip()] = value.strip()
+    return headers
+
+
 def synthesis(
-    text: str, address="127.0.0.1", port=50021, speaker=0, pitch=0.0, speed=1.0
+    text: str,
+    address: str,
+    headers: dict = None,
+    speaker: int = 0,
+    pitch: float = 0.0,
+    speed: float = 1.0,
 ) -> float:
     """音声生成
 
     Args:
         text : 生成する文章
-        address : VOCIEVOXのAPIサーバーのアドレス
+        address : VOICEVOXのAPIサーバーのフルアドレス
+        headers : リクエストに追加するヘッダー
         speaker : speaker_id
         pitch : ピッチ
         speed : スピード
@@ -20,94 +35,87 @@ def synthesis(
     Returns:
         生成時間(秒)
     """
-    address = "http://"+address
     query_payload = {"text": text, "speaker": speaker}
-    resp = requests.post(f"{address}:{port}/audio_query", params=query_payload)
-    if not resp.status_code == 200:
-        raise ConnectionError("Status code: %d" % resp.status_code)
+    try:
+        resp = requests.post(f"{address}/audio_query", params=query_payload, headers=headers)
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        raise ConnectionError(f"Failed to send audio_query request: {e}")
+
     query_data = resp.json()
-    synth_payload = {"speaker": speaker}
     query_data["speedScale"] = speed
     query_data["pitchScale"] = pitch
-    before = perf_counter()
-    resp = requests.post(f"{address}:{port}/synthesis",
-                         params=synth_payload, data=json.dumps(query_data))
-    if not resp.status_code == 200:
-        raise ConnectionError("Status code: %d" % resp.status_code)
-    after = perf_counter()
+
+    try:
+        before = perf_counter()
+        resp = requests.post(f"{address}/synthesis", params={"speaker": speaker}, json=query_data, headers=headers)
+        resp.raise_for_status()
+        after = perf_counter()
+    except requests.RequestException as e:
+        raise ConnectionError(f"Failed to send synthesis request: {e}")
+
     return after - before
 
 
-def gen_text(count: int):
-    return "".join(
-        [chr(random.randint(ord("あ"), ord("ん"))) for i in range(count)])
+def gen_text(count: int) -> str:
+    """ランダムなひらがなの文字列を生成"""
+    return "".join(random.choice("あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん") for _ in range(count))
 
 
-def get_speakers(address="127.0.0.1", port=50021):
-    address = "http://"+address
-    speakers = {}
-    resp = requests.get(f"{address}:{port}/speakers")
-    resp_dict = resp.json()
-    for i in resp_dict:
-        speakers[i["name"]] = {}
-        for s in i["styles"]:
-            speakers[i["name"]][s["name"]] = s["id"]
-    return speakers
-
-
-def bench(length: int, count=10, address="127.0.0.1", port=50021, quiet=False):
-    synthesis("test", address=address, port=port)
-    tmp = 0
+def bench(length: int, count: int, address: str, headers: dict = None, quiet: bool = False) -> float:
+    """ベンチマークを実行"""
+    synthesis("test", address, headers)  # 初回呼び出しでキャッシュなどをウォームアップ
+    total_time = 0
     for i in range(count):
         text = gen_text(length)
-        elapsed_time = synthesis(text, address=address, port=port)
-        tmp += elapsed_time
+        elapsed_time = synthesis(text, address, headers)
+        total_time += elapsed_time
         if not quiet:
-            print(i+1, "time:", elapsed_time)
-        result = round(tmp / count, 4)
-    return result
+            print(f"Run {i + 1}, Time: {elapsed_time:.4f} seconds")
+    return round(total_time / count, 4)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="VOICEVOX Benchmark Script")
     parser.add_argument(
-        "-s", help="VOICEVOX API Server Address", default="127.0.0.1")
-    parser.add_argument("-p", help="VOICEVOX API Server Port", default=50021)
-    parser.add_argument("-q", help="Quiet benchmark log", action="store_true")
-    parser.add_argument("-w", help="No wait for key input",
-                        action="store_true")
-    parser.add_argument("--ssl", help="Use SSL", action="store_true")
+        "-a",
+        "--address",
+        help="Full VOICEVOX API Server Address (e.g., http://127.0.0.1:50021)",
+        default="http://127.0.0.1:50021",
+    )
+    parser.add_argument(
+        "-h",
+        "--header",
+        help="Specify request headers (e.g., 'Authorization: Bearer token')",
+        action="append",
+        default=[],
+    )
+    parser.add_argument("-q", "--quiet", help="Suppress benchmark logs", action="store_true")
     args = parser.parse_args()
-    if not args.w:
-        input("Press Enter key to start benchmark...")
-    if args.ssl:
-        ADDRESS = "https://" + args.s
-    else:
-        ADDRESS = "http://" + args.s
-    score_10 = bench(length=10, address=args.s, port=args.p, quiet=args.q)
-    score_50 = bench(length=50, address=args.s, port=args.p, quiet=args.q)
-    score_100 = bench(length=100, address=args.s, port=args.p, quiet=args.q)
-    score_avg = round((score_10 + score_50 + score_100) / 3, 4)
-    resp = requests.get(f"{ADDRESS}:{args.p}/version")
-    info_engine = resp.text.replace("\"", "")
-    resp = requests.get(f"{ADDRESS}:{args.p}/supported_devices")
-    info_devices = resp.json()
-    if info_devices["cuda"]:
-        info_device = "CUDA"
-    elif info_devices["dml"]:
-        info_device = "DirectML"
-    else:
-        info_device = "CPU"
-    print()
-    print("=========== Info ===========")
-    print(" Engine:", info_engine)
-    print(" Device:", info_device)
+
+    # ヘッダーをパース
+    headers = parse_headers(args.header)
+
+    print("Starting benchmark...")
+    score_10 = bench(length=10, count=10, address=args.address, headers=headers, quiet=args.quiet)
+    score_50 = bench(length=50, count=10, address=args.address, headers=headers, quiet=args.quiet)
+    score_100 = bench(length=100, count=10, address=args.address, headers=headers, quiet=args.quiet)
+    avg_score = round((score_10 + score_50 + score_100) / 3, 4)
+
+    try:
+        version = requests.get(f"{args.address}/version", headers=headers).text.strip('"')
+        devices = requests.get(f"{args.address}/supported_devices", headers=headers).json()
+    except requests.RequestException as e:
+        raise ConnectionError(f"Failed to fetch engine info: {e}")
+
+    device_type = "CUDA" if devices.get("cuda") else "DirectML" if devices.get("dml") else "CPU"
+
+    print("\n=========== Info ===========")
+    print(f" Engine: {version}")
+    print(f" Device: {device_type}")
     print("========== Result ==========")
-    print(" 10: ", score_10)
-    print(" 50: ", score_50)
-    print(" 100:", score_100)
-    print(" Avg:", score_avg)
-    print("============================")
-    print()
-    if not args.w:
-        input("Press Enter key to exit...")
+    print(f" 10 char: {score_10} sec")
+    print(f" 50 char: {score_50} sec")
+    print(f"100 char: {score_100} sec")
+    print(f" Avg: {avg_score} sec")
+    print("============================\n")
