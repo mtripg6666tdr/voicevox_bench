@@ -84,7 +84,6 @@ if __name__ == "__main__":
         default="http://127.0.0.1:50021",
     )
     parser.add_argument(
-        "-h",
         "--header",
         help="Specify request headers (e.g., 'Authorization: Bearer token')",
         action="append",
