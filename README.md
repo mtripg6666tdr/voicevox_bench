@@ -3,7 +3,9 @@
 リポジトリをフォークして ワンラインで実行できるようにしたやつ
 
 1. リポジトリをクローン
-2. `docker compose up --abort-on-container-exit`
+2. `compose.yml`を調整する
+  - CPUの場合の構成になっているので、GPUの場合にはコメントアウトを調整する
+3. `docker compose up --abort-on-container-exit`
 
 以下、元の README
 ---
