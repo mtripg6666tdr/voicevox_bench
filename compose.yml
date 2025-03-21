@@ -1,0 +1,33 @@
+services:
+  bench:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bench
+    depends_on:
+      voicevox:
+        condition: service_healthy
+    command: python /app/bench.py --address http://voicevox:50021
+
+  voicevox:
+    build:
+      context: voicevox
+      dockerfile: Dockerfile
+      args:
+        # 以下GPU用の行
+        # - BASE_TAG=nvidia-latest
+        # 以下CPU用の行
+        - BASE_TAG=cpu-latest
+    container_name: voicevox
+    ports:
+      - "50021:50021"
+    healthcheck:
+      test: curl -f http://localhost:50021 || exit 1
+    # GPUの場合は以下をコメントアウトを解除してください
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           capabilities: [gpu]
+    #           count: all

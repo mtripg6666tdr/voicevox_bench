@@ -1,13 +1,22 @@
 # VOICEVOXベンチマーク
 
-1. Pythonのダウンロード
-2. 解凍してcmdにてディレクトリ移動
-3. VOICEVOXを起動
-4. `pip install requests`と`python bench.py`を順番実行
+リポジトリをフォークして ワンラインで実行できるようにしたやつ
 
---address https://voicevox:50021 等で外部へのテストも可能です。
---header "Key: Value" という感じでheaderの指定が可能です。
+1. リポジトリをクローン
+2. `docker compose up --abort-on-container-exit`
 
-### 任意
-5. 結果をフォームで送る
-https://forms.gle/WPXeRtJeACFdoFhF8
+以下、元の README
+---
+> 
+> 1. Pythonのダウンロード
+> 2. 解凍してcmdにてディレクトリ移動
+> 3. VOICEVOXを起動
+> 4. `pip install requests`と`python bench.py`を順番実行
+> 
+> --address https://voicevox:50021 等で外部へのテストも可能です。
+> --header "Key: Value" という感じでheaderの指定が可能です。
+> 
+> ### 任意
+> 5. 結果をフォームで送る
+> https://forms.gle/WPXeRtJeACFdoFhF8
+> 
